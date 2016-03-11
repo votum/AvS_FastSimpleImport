@@ -536,56 +536,51 @@ class AvS_FastSimpleImport_Model_Import_Entity_Category_Product extends Mage_Imp
     protected function _saveValidatedBunches()
     {
         $source          = $this->_getSource();
+        $productDataSize = 0;
         $bunchRows       = array();
         $startNewBunch   = false;
+        $nextRowBackup   = array();
         $maxDataSize = Mage::getResourceHelper('importexport')->getMaxDataSize();
         $bunchSize = Mage::helper('importexport')->getBunchSize();
+        $currentMasterValue = null;
 
         $source->rewind();
         $this->_dataSourceModel->cleanBunches();
 
-        while ($source->valid() || count($bunchRows) || isset($entityGroup)) {
+        while ($source->valid() || $bunchRows) {
             if ($startNewBunch || !$source->valid()) {
-                /* If the end approached add last validated entity group to the bunch */
-                if (!$source->valid() && isset($entityGroup)) {
-                    $bunchRows = array_merge($bunchRows, $entityGroup);
-                    unset($entityGroup);
-                }
                 $this->_dataSourceModel->saveBunch($this->getEntityTypeCode(), $this->getBehavior(), $bunchRows);
-                $bunchRows = array();
-                $startNewBunch = false;
+
+                $bunchRows       = $nextRowBackup;
+                $productDataSize = strlen(serialize($bunchRows));
+                $startNewBunch   = false;
+                $nextRowBackup   = array();
             }
             if ($source->valid()) {
                 if ($this->_errorsCount >= $this->_errorsLimit) { // errors limit check
-                    return $this;
+                    return;
                 }
                 $rowData = $source->current();
 
                 $this->_processedRowsCount++;
 
-                if (isset($rowData[$this->masterAttributeCode]) && trim($rowData[$this->masterAttributeCode])) {
-                    /* Add entity group that passed validation to bunch */
-                    if (isset($entityGroup)) {
-                        $bunchRows = array_merge($bunchRows, $entityGroup);
-                        $productDataSize = strlen(serialize($bunchRows));
+                if ($this->validateRow($rowData, $source->key())) { // add row to bunch for save
+                    $rowData = $this->_prepareRowForDb($rowData);
+                    $rowSize = strlen(Mage::helper('core')->jsonEncode($rowData));
 
-                        /* Check if the nw bunch should be started */
-                        $isBunchSizeExceeded = ($bunchSize > 0 && count($bunchRows) >= $bunchSize);
-                        $startNewBunch = $productDataSize >= $maxDataSize || $isBunchSizeExceeded;
+                    $isBunchSizeExceeded = ($bunchSize > 0 && count($bunchRows) >= $bunchSize);
+                    $isNewGroup = ($currentMasterValue != $rowData[$this->masterAttributeCode])?: false;
+
+                    if (($productDataSize + $rowSize) >= $maxDataSize || $isBunchSizeExceeded && $isNewGroup) {
+                        $startNewBunch = true;
+                        $nextRowBackup = array($source->key() => $rowData);
+                    } else {
+                        $bunchRows[$source->key()] = $rowData;
+                        $productDataSize += $rowSize;
                     }
-
-                    /* And start a new one */
-                    $entityGroup = array();
-                }
-
-                if (isset($entityGroup) && $this->validateRow($rowData, $source->key())) {
-                    /* Add row to entity group */
-                    $entityGroup[$source->key()] = $this->_prepareRowForDb($rowData);
-                } elseif (isset($entityGroup)) {
-                    /* In case validation of one line of the group fails kill the entire group */
-                    unset($entityGroup);
                 }
                 $source->next();
+                $currentMasterValue = $rowData[$this->masterAttributeCode];
             }
         }
         return $this;
