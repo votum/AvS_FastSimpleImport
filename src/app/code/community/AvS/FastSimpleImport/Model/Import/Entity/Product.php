@@ -979,7 +979,9 @@ class AvS_FastSimpleImport_Model_Import_Entity_Product extends AvS_FastSimpleImp
             if (self::SCOPE_STORE == $rowScope) {
                 if (self::SCOPE_WEBSITE == $attribute->getIsGlobal()) {
                     // check website defaults already set
-                    if (!isset($attributes[$attrTable][$rowSku][$attrId][$rowStore])) {
+                    if (!isset($attributes[$attrTable][$rowSku][$attrId][$rowStore])
+                        || 'multiselect' == $attribute->getFrontendInput()
+                    ) {
                         $storeIds = $this->_storeIdToWebsiteStoreIds[$rowStore];
                     }
                 } elseif (self::SCOPE_STORE == $attribute->getIsGlobal()) {
