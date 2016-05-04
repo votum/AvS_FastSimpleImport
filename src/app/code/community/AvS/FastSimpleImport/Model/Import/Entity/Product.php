@@ -377,7 +377,7 @@ class AvS_FastSimpleImport_Model_Import_Entity_Product extends AvS_FastSimpleImp
 
         $attribute->save();
 
-        $this->_attributeOptions[$attribute->getAttributeCode()][] = $optionLabel;
+        $this->_attributeOptions[$attribute->getAttributeCode()][] = Mage::helper('fastsimpleimport')->strtolower($optionLabel);
         $this->_initTypeModels();
     }
 
@@ -1139,7 +1139,7 @@ class AvS_FastSimpleImport_Model_Import_Entity_Product extends AvS_FastSimpleImp
                     $categories[$rowSku][$categoryId] = true;
                 } elseif (!empty($categoryPath)) {
                     $categories[$rowSku][$this->_categories[$categoryPath]] = true;
-                } elseif (array_key_exists(self::COL_CATEGORY, $rowData)) {
+                } elseif (array_key_exists(self::COL_CATEGORY, $rowData) && $rowScope == self::SCOPE_DEFAULT) {
                     $categories[$rowSku] = array();
                 }
 
